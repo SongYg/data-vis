@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport"
+        content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1" />
+    <title>交通大数据</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+        integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <link rel="stylesheet" href="css/app.css" />
+</head>
+
+<body class="bg02">
+    <header class="header">
+        <h3>交通大数据</h3>
+    </header>
+
+    <div class="wrapper">
+        <div class="container-fluid">
+            <div class="row fill-h">
+                <div class="col-lg-7 fill-h">
+                    <div class="xpanel-wrapper xpanel-wrapper-1">
+                        <div class="xpanel">
+                            <div class="fill-h" id="mapbox3d"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-5 fill-h">
+                    <div class="xpanel-wrapper xpanel-wrapper-2">
+                        <div class="xpanel">
+                            <div class="fill-h" id="heatmap"></div>
+                        </div>
+                    </div>
+                    <div class="xpanel-wrapper xpanel-wrapper-2">
+                        <div class="xpanel">
+                            <div class="fill-h" id="histogram"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.4.1.min.js"></script>
+    <script type="text/javascript"
+        src="https://api.map.baidu.com/api?v=2.0&ak=ItgeBPfuhdZyMq54TXFjrN36xWQblUqq"></script>
+    <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts/echarts.min.js"></script>
+    <script type="text/javascript" src="http://echarts.baidu.com/gallery/vendors/echarts-gl/echarts-gl.min.js"></script>
+    <script type="text/javascript" src="js/mapbox-3d.js"></script>
+    <script type="text/javascript" src="js/histogram.js"></script>
+    <script type="text/javascript" src="js/theme/chalk.js"></script>
+
+    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v1.1.1/mapbox-gl.js'></script>
+    <script type="text/javascript">
+        mapboxgl.accessToken = "pk.eyJ1IjoieXVndWFuZ3MiLCJhIjoiY2p5NXo0em5yMGJzczNibGU2MTNsbzJqMyJ9.y2TGoxsWJ0yVeDblSQTnrg";
+        $(function () {
+            $.getJSON('./data/data.json').done(function (data) {
+                var histogramChart = null
+                var mapbox3dChart = null
+                var baseOption = null
+
+                var filterHour = ['==', ['number', ['get', 'Hour']], 12];
+                var filterDay = ['!=', ['string', ['get', 'Day']], 'placeholder'];
+                var collisionsMap = new mapboxgl.Map({
+                    container: 'heatmap',
+                    style: 'mapbox://styles/mapbox/light-v10',
+                    center: [-73.9059, 40.7128],
+                    zoom: 10
+                });
+
+                function getBaseOpt(timedata) {
+                    // set timeline base opt
+                    var bmapOpt = {
+                        baseOption: {
+                            timeline: {
+                                axisType: 'category',
+                                autoPlay: true,
+                                playInterval: 3000,
+                                data: timedata,
+                                label: {
+                                    formatter: function (s) {
+                                        return s;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return bmapOpt;
+                }
+
+                function controlInit(opt, chart) {
+                    // timelineChart = echarts.init(document.getElementById("timeline"))
+                    // timelineChart.setOption(opt)
+                    chart.setOption(opt)
+                }
+
+                function collInit(opt) {
+                    collisionsMap.on('load', function () {
+                        collisionsMap.addLayer({
+                            id: 'collisions',
+                            type: 'circle',
+                            source: {
+                                type: 'geojson',
+                                data: './data/collisions1601.geojson' // replace this with the url of your own geojson
+                            },
+                            paint: {
+                                'circle-radius': [
+                                    'interpolate',
+                                    ['linear'],
+                                    ['number', ['get', 'Casualty']],
+                                    0, 4,
+                                    5, 24
+                                ],
+                                'circle-color': [
+                                    'interpolate',
+                                    ['linear'],
+                                    ['number', ['get', 'Casualty']],
+                                    0, '#2DC4B2',
+                                    1, '#3BB3C3',
+                                    2, '#669EC4',
+                                    3, '#8B88B6',
+                                    4, '#A2719B',
+                                    5, '#AA5E79'
+                                ],
+                                'circle-opacity': 0.8
+                            },
+                            'filter': ['all', filterHour, filterDay]
+                        });
+                    });
+                }
+
+                function heatgridInit(opt) {
+                    heatgridChart = echarts.init(document.getElementById("heatgrid"))
+                    heatgridChart.setOption(opt)
+                }
+
+                function histogramInit(opt) {
+                    histogramChart = echarts.init(document.getElementById("histogram"), "chalk")
+                    histogramChart.setOption(opt)
+                }
+
+                function mapbox3dInit(opt) {
+                    mapbox3dChart = echarts.init(document.getElementById("mapbox3d"))
+                    mapbox3dChart.setOption(opt)
+                }
+
+                const timedata = data['key']
+                const mapbox3dData = data['mapbox3d']
+                const histogramData = data['histogram']
+
+                mp3ddata = {
+                    'key': timedata[0],
+                    'val': mapbox3dData[0]
+                }
+                hisdata = {
+                    'key': timedata[0],
+                    'val': histogramData[0]
+                }
+                var histogramOpt = getHistogramOpt(hisdata)
+
+                var mapbox3dOpt = get3DbarOpt(mp3ddata)
+                var heatmapOpt = null
+                const baseOpt = getBaseOpt(timedata)
+
+                mapbox3dInit(mapbox3dOpt)
+                collInit(heatmapOpt)
+                histogramInit(histogramOpt)
+                controlInit(baseOpt, mapbox3dChart)
+
+
+                mapbox3dChart.on('timelinechanged', function (timeLineIndex) {
+                    // 设置 每个series里的xAxis里的值
+                    const hours = [14, 15, 16]
+
+                    var arrIndex = parseInt(timeLineIndex.currentIndex);
+
+                    mp3ddata = {
+                        'key': timedata[arrIndex],
+                        'val': mapbox3dData[arrIndex]
+                    }
+                    var mapbox3dOpt = get3DbarOpt(mp3ddata)
+                    mapbox3dChart.setOption(mapbox3dOpt)
+
+                    var hour = hours[arrIndex];
+                    // update the map
+                    filterHour = ['==', ['number', ['get', 'Hour']], hour];
+                    collisionsMap.setFilter('collisions', ['all', filterHour, filterDay]);
+
+                    hisdata = {
+                        'key': timedata[arrIndex],
+                        'val': histogramData[arrIndex]
+                    }
+                    histogramOpt = getHistogramOpt(hisdata)
+                    histogramChart.setOption(histogramOpt)
+                });
+
+            });
+
+        });
+    </script>
+</body>
+
+</html>
